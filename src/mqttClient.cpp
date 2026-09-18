@@ -147,11 +147,6 @@ void MqttClient::on_message(
                 
                 bool success = database_.insertWeatherData(weather);
 
-                std::cout
-                    << "Rueckgabewert insertWeatherData: "
-                    << success
-                    << '\n';
-
                 if (!success)
                 {
                     std::cerr

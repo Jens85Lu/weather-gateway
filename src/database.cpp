@@ -136,8 +136,6 @@ bool Database::insertWeatherData(const WeatherData& weather)
                "Einfügen uebersprungen.\n";
     }
 
-    std::cout << "insertWeatherData: return true\n";
-
     return true;
 }
 
