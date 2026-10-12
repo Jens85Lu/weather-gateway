@@ -4,13 +4,8 @@
 #include "weather.hpp"
 #include <string>
 #include <vector>
+#include "timeInterval.hpp"
 
-
-struct SyncInfo
-{
-    std::string first;
-    std::string last;
-};
 
 class Database
 {

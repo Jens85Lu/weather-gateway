@@ -26,20 +26,19 @@ target_include_directories(weather-gateway
 )
 
 find_package(SQLite3 REQUIRED)
-find_package(CURL REQUIRED)
 
-message(STATUS "CURL_LIBRARIES = ${CURL_LIBRARIES}")
-message(STATUS "CURL_INCLUDE_DIRS = ${CURL_INCLUDE_DIRS}")
+find_library(CPP_HTTPLIB_LIBRARY
+    NAMES cpp-httplib
+)
 
 target_include_directories(weather-gateway
     PRIVATE
         include
-        ${CURL_INCLUDE_DIRS}
 )
 
 target_link_libraries(weather-gateway
     mosquittopp
     mosquitto
     SQLite::SQLite3
-    ${CURL_LIBRARIES}
+    ${CPP_HTTPLIB_LIBRARY}
 )

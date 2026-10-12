@@ -4,7 +4,7 @@
 bool validateWeatherJson(const json& data)
 {
     if (!data.contains("timestamp") ||
-        !data.contains("temp") ||
+        !data.contains("temperature") ||
         !data.contains("humidity") ||
         !data.contains("pressure"))
     {
@@ -13,7 +13,7 @@ bool validateWeatherJson(const json& data)
     }
 
     if (!data["timestamp"].is_string() ||
-        !data["temp"].is_number() ||
+        !data["temperature"].is_number() ||
         !data["humidity"].is_number() ||
         !data["pressure"].is_number())
     {
@@ -28,7 +28,7 @@ WeatherData weatherDataFromJson(const json& data)
 {
     WeatherData weather(
         data["timestamp"],
-        data["temp"],
+        data["temperature"],
         data["humidity"],
         data["pressure"]
     );
@@ -37,3 +37,40 @@ WeatherData weatherDataFromJson(const json& data)
 
 }
 
+
+std::vector<WeatherData> weatherDataFromJsonArray(
+    const json& data
+)
+{
+    std::vector<WeatherData> result;
+
+    if (!data.is_array())
+    {
+        std::cerr << "JSON Fehler: Array erwartet\n";
+        return result;
+    }
+
+    for (const auto& entry : data)
+    {
+        if (!validateWeatherJson(entry))
+        {
+            continue;
+        }
+
+        result.push_back(
+            weatherDataFromJson(entry)
+        );
+    }
+
+    return result;
+}
+
+SyncInfo syncInfoFromJson(const json& data)
+{
+    
+    SyncInfo syncInfo;
+    syncInfo.first = data["first"];
+    syncInfo.last = data["last"];
+
+    return syncInfo;
+}

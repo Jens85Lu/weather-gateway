@@ -6,46 +6,39 @@
 #include "httpClient.hpp"
 
 #include <iostream>
+#include <chrono>
+#include <thread>
 
 int main()
 {
-    // Database database("database/weather.db");
+    Database database("database/weather.db");
 
-    // mosqpp::lib_init();
+    mosqpp::lib_init();
 
-    // MqttClient client(database);
-
-    // Synchronizer synchronizer(database, client);
-
-    // // nach Empfang der SD Zeitinfo: Berechnung und Anforderung der fehlenden Minuten 
-    // client.setSyncInfoCallback(
-    //     [&synchronizer]() 
-    //     {
-    //     synchronizer.onSyncInfoAvailable();
-    //     });
-
-    // // nach dem kompletten Empfang der fehlenden Minuten eines Intervalls
-    // // Anforderung des nächsten Intervalls
-    // client.setHistoryCompleteCallback( // nach dem kompletten Empfang des ersten History Intervalls
-    //     [&synchronizer]()
-    //     {
-    //         synchronizer.onHistoryComplete();
-    //     });
-
-    // client.loop_forever();
-
-    // mosqpp::lib_cleanup(); 
-
+    MqttClient mqttClient(database);
     HttpClient httpClient("192.168.0.17");
 
-    std::string response =
-        httpClient.getHistory(
-            "2026-09-17 10:00",
-            "2026-09-17 10:10"
-        );
+    Synchronizer synchronizer(database, mqttClient, httpClient);
 
-    std::cout << response << '\n';
+    // Nach Empfang der SD-Zeitinfo:
+    // Berechnung und Anforderung der fehlenden Minuten
+    mqttClient.setSyncInfoCallback(
+        [&synchronizer]()
+        {
+            synchronizer.onSyncInfoAvailable();
+        });
 
+    // Nach dem kompletten Empfang der fehlenden Minuten eines Intervalls:
+    // Anforderung des nächsten Intervalls
+    mqttClient.setHistoryCompleteCallback(
+        [&synchronizer]()
+        {
+            synchronizer.onHistoryComplete();
+        });
+
+    mqttClient.loop_forever();
+
+    mosqpp::lib_cleanup();
 
     return 0;
 }
