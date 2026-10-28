@@ -12,6 +12,8 @@ public:
 
     void on_connect(int rc) override;
 
+    void on_disconnect(int rc) override;
+
     void on_message(const struct mosquitto_message* message) override;
 
     void requestSyncInfo();
@@ -25,13 +27,14 @@ public:
         syncInfoCallback_ = callback;
     }
 
-    using HistoryCompleteCallback = std::function<void()>;
+    using IntervalCompleteCallback = std::function<void()>;
 
-    void setHistoryCompleteCallback(HistoryCompleteCallback callback)
+    void setIntervalCompleteCallback(IntervalCompleteCallback callback)
     {
-        historyCompleteCallback_ = callback;
+        intervalCompleteCallback_ = callback;
     }
 
+    bool historyStorageSuccessful = true;
     
 private:
     Database& database_;
@@ -40,5 +43,6 @@ private:
 
     SyncInfoCallback syncInfoCallback_;
     
-    HistoryCompleteCallback historyCompleteCallback_;
+    IntervalCompleteCallback intervalCompleteCallback_;
+
 };

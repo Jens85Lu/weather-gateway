@@ -19,12 +19,9 @@ public:
     
     void onSyncInfoAvailable();
 
-    void onHistoryComplete();
+    void onIntervalComplete();
 
-    void processHistoryInterval(
-    const TimeInterval& interval,
-    const std::vector<WeatherData>& weatherData
-    );
+    bool processHistoryInterval(const std::vector<WeatherData>& weatherData);
 
     
 private:
@@ -32,13 +29,16 @@ private:
     MqttClient& mqttClient_;
     HttpClient& httpClient_;
 
-    std::string addMinute(
+    std::string plusMinute(
         const std::string& timestamp
     );
 
+    std::string minusMinute(
+    const std::string &timestamp
+    );
+
     std::vector<std::string> getMissingMinutes(
-    const SyncInfo& sqliteInfo,
-    const SyncInfo& sdInfo
+    const SyncInfo& sdInfo, std::string& lastSync
     );
 
     std::vector<TimeInterval> createIntervals(

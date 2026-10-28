@@ -30,10 +30,10 @@ int main()
 
     // Nach dem kompletten Empfang der fehlenden Minuten eines Intervalls:
     // Anforderung des nächsten Intervalls
-    mqttClient.setHistoryCompleteCallback(
+    mqttClient.setIntervalCompleteCallback(
         [&synchronizer]()
         {
-            synchronizer.onHistoryComplete();
+            synchronizer.onIntervalComplete();
         });
 
     mqttClient.loop_forever();

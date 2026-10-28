@@ -6,7 +6,10 @@
 MqttClient::MqttClient(Database& database)
     : database_(database)
 {
-    connect("localhost", 1883, 60);
+    int rc = connect("localhost", 1883, 60);
+
+    std::cout << "MQTT connect() rc="
+              << rc << std::endl;
 }
 
 void MqttClient::on_connect(int rc)
@@ -17,14 +20,21 @@ void MqttClient::on_connect(int rc)
 
         subscribe(nullptr, "weather/live");
         subscribe(nullptr, "weather/history/data");
+        subscribe(nullptr, "weather/status");
 
-        requestSyncInfo();
+        //requestSyncInfo();
     }
     else
     {
         std::cerr << "MQTT Verbindung fehlgeschlagen: "
                   << rc << '\n';
     }
+}
+
+void MqttClient::on_disconnect(int rc)
+{
+    std::cerr << "MQTT getrennt, rc="
+              << rc << std::endl;
 }
 
 void MqttClient::on_message(
@@ -35,16 +45,38 @@ void MqttClient::on_message(
     // ========================================
 
     std::string topic(message->topic);
+    std::string status(
+            static_cast<char*>(message->payload),
+            message->payloadlen
+        );
 
     std::string jsonMessage(
         static_cast<char*>(message->payload),
         message->payloadlen
     );
 
-    std::cout
-        << "MQTT Nachricht auf Topic: "
-        << topic
-        << '\n';
+    if (topic == "weather/status")
+    {
+        std::cout
+            << "MQTT Nachricht auf Topic "
+            << topic
+            << " : "
+            << status
+            << '\n';
+    }
+
+    if (topic == "weather/status")
+    {
+        if (status == "online")
+        {
+            std::cout
+                << "Wetterstation wieder online\n";
+
+            requestSyncInfo();
+        }
+
+        return;
+    }
 
 
     // ========================================
@@ -150,15 +182,38 @@ void MqttClient::on_message(
                 if (!success)
                 {
                     std::cerr
-                        << "History-Daten konnten nicht gespeichert werden.\n";
+                        << "History-Daten konnten nicht gespeichert werden: "
+                        << weather.timestamp() << '\n';
+                    std::cerr
+                        << "History-Speicherfehler bei "
+                        << weather.timestamp() << '\n';
+
+                        historyStorageSuccessful = false;
                 }
             }
 
+            std::cout
+                << "History-Status nach Verarbeitung: "
+                << historyStorageSuccessful << '\n';
+
             if(last)
             {
-                if(historyCompleteCallback_)
+                std::cout
+                    << "History-Speicherstatus vor Abschluss: "
+                    << historyStorageSuccessful << '\n';
+
+                if (historyStorageSuccessful)
                 {
-                    historyCompleteCallback_();
+                    if(intervalCompleteCallback_)
+                    {
+                        intervalCompleteCallback_();
+                    }
+                }
+                else
+                {
+                    std::cerr
+                        << "Intervall nicht erfolgreich gespeichert. "
+                        "Synchronisation wird nicht fortgesetzt.\n";
                 }
             }
 

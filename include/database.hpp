@@ -20,10 +20,15 @@ class Database
 
         SyncInfo getSyncInfo();
 
+        std::string getLastSync();
+        bool markLastSync(const std::string& minute);
+        
         std::vector<std::string> getTimestamps(
             const std::string& first,
             const std::string& last
         );
+
+        
 
 
     private:

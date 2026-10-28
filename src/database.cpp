@@ -4,6 +4,7 @@
 #include <iostream>
 #include <cstdlib>
 
+
 Database::Database(const char* filename)
     : db_(nullptr)
 {
@@ -13,10 +14,25 @@ Database::Database(const char* filename)
     {
         std::cerr << "Datenbank konnte nicht geöffnet werden: "
                   << sqlite3_errmsg(db_) << '\n';
+
+        sqlite3_close(db_);
+        db_ = nullptr;
+        std::exit(EXIT_FAILURE);
     }
-    else
+
+    std::cout << "Datenbank geöffnet\n";
+
+    // Bis zu 5 Sekunden auf eine Datenbanksperre warten
+    rc = sqlite3_busy_timeout(db_, 5000);
+
+    if (rc != SQLITE_OK)
     {
-        std::cout << "Datenbank geöffnet\n";
+        std::cerr << "SQLite Busy-Timeout konnte nicht gesetzt werden: "
+                  << sqlite3_errmsg(db_) << '\n';
+
+        sqlite3_close(db_);
+        db_ = nullptr;
+        std::exit(EXIT_FAILURE);
     }
 
     if (!createTables())
@@ -25,9 +41,11 @@ Database::Database(const char* filename)
             << "Datenbanktabellen konnten nicht erstellt werden.\n";
 
         sqlite3_close(db_);
+        db_ = nullptr;
         std::exit(EXIT_FAILURE);
     }
 }
+
 
 Database::~Database()
 {
@@ -49,7 +67,7 @@ bool Database::createTables()
             pressure REAL NOT NULL
         );
 
-        CREATE TABLE IF NOT EXISTS sync_checked (
+        CREATE TABLE IF NOT EXISTS lastSync (
             minute TEXT PRIMARY KEY
         );
     )";
@@ -73,7 +91,7 @@ bool Database::createTables()
         return false;
     }
 
-    std::cout << "Tabellen weather und sync_checked bereit\n";
+    std::cout << "Tabellen weather und lastSync bereit\n";
 
     return true;
 }
@@ -113,11 +131,19 @@ bool Database::insertWeatherData(const WeatherData& weather)
 
     if (rc != SQLITE_DONE)
     {
-        std::cerr << "SQL Fehler beim Einfügen: "
-                 << sqlite3_errmsg(db_) << '\n';
+        int extendedRc = sqlite3_extended_errcode(db_);
+
+        std::cerr << "SQL Fehler beim Einfügen:\n"
+                  << "  Rückgabecode: " << rc << '\n'
+                  << "  Erweiterter Code: " << extendedRc << '\n'
+                  << "  Fehlertext: " << sqlite3_errmsg(db_) << '\n'
+                  << "  Datenbank: "
+                  << sqlite3_db_filename(db_, "main") << '\n';
+                  std::cerr << "  Systemfehler (errno): "
+                    << sqlite3_system_errno(db_) << '\n';
+            
 
         sqlite3_finalize(statement);
-
         return false;
     }
 
@@ -256,6 +282,129 @@ std::vector<std::string> Database::getTimestamps(
     return timestamps;
 }
 
+
+std::string Database::getLastSync()
+{
+    const char* sql = R"(
+        SELECT minute
+        FROM lastSync
+        ORDER BY minute DESC
+        LIMIT 1;
+    )";
+
+    sqlite3_stmt* statement = nullptr;
+
+    int rc = sqlite3_prepare_v2(
+        db_,
+        sql,
+        -1,
+        &statement,
+        nullptr
+    );
+
+    if (rc != SQLITE_OK)
+    {
+        std::cerr
+            << "SQL Fehler beim Vorbereiten: "
+            << sqlite3_errmsg(db_)
+            << '\n';
+
+        return "";
+    }
+
+    rc = sqlite3_step(statement);
+
+    std::string lastSync;
+
+    if (rc == SQLITE_ROW)
+    {
+        const unsigned char* value =
+            sqlite3_column_text(statement, 0);
+
+        if (value != nullptr)
+        {
+            lastSync =
+                reinterpret_cast<const char*>(value);
+        }
+    }
+    else if (rc != SQLITE_DONE)
+    {
+        std::cerr
+            << "SQL Fehler beim Lesen: "
+            << sqlite3_errmsg(db_)
+            << '\n';
+    }
+
+    sqlite3_finalize(statement);
+
+    return lastSync;
+}
+
+bool Database::markLastSync(const std::string& minute)
+{
+    const char* sql = R"(
+        INSERT OR IGNORE into lastSync (minute) VALUES (?);
+    )";
+
+    sqlite3_stmt* statement = nullptr;
+
+    int rc = sqlite3_prepare_v2(
+        db_,
+        sql,
+        -1,
+        &statement,
+        nullptr
+    );
+    
+    if (rc != SQLITE_OK)
+    {
+        std::cerr << "SQL Fehler beim Vorbereiten:"
+                  << sqlite3_errmsg(db_) << '\n';
+
+        return false;
+    }
+
+    rc = sqlite3_bind_text(statement, 1, minute.c_str(), -1, SQLITE_TRANSIENT);
+
+    if (rc != SQLITE_OK)
+    {
+        std::cerr << "SQL Fehler beim Binden: "
+                << sqlite3_errmsg(db_) << '\n';
+
+        sqlite3_finalize(statement);
+        return false;
+    }
+
+    rc = sqlite3_step(statement);
+
+    if (rc != SQLITE_DONE)
+    {
+        std::cerr << "SQL Fehler beim Einfügen: "
+                 << sqlite3_errmsg(db_) << '\n';
+
+        sqlite3_finalize(statement);
+
+        return false;
+    }
+
+    bool inserted = (sqlite3_changes(db_) > 0);
+
+    sqlite3_finalize(statement);
+
+    if (inserted)
+    {
+        std::cout << "lastSync gespeichert\n";
+    }
+    else
+    {
+        std::cout
+            << "SQLite: lastSync bereits vorhanden - "
+               "Einfügen uebersprungen.\n";
+    }
+
+    return true;
+}
+
 bool Database::isMinuteChecked(const std::string& minute)
 {
     const char* sql = R"(
@@ -308,6 +457,8 @@ bool Database::markMinuteChecked(const std::string& minute)
         INSERT OR IGNORE INTO sync_checked (minute)
         VALUES (?);
     )";
+
+    
 
     sqlite3_stmt* statement = nullptr;
 
